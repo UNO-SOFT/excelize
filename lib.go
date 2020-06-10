@@ -15,19 +15,21 @@ import (
 	"container/list"
 	"fmt"
 	"io"
-	"log"
 	"strconv"
 	"strings"
 	"unsafe"
 )
 
-// ReadZipReader can be used to read an XLSX in memory without touching the
+// ReadZipReader can be used to read the spreadsheet in memory without touching the
 // filesystem.
 func ReadZipReader(r *zip.Reader) (map[string][]byte, int, error) {
+	var err error
 	fileList := make(map[string][]byte, len(r.File))
 	worksheets := 0
 	for _, v := range r.File {
-		fileList[v.Name] = readFile(v)
+		if fileList[v.Name], err = readFile(v); err != nil {
+			return nil, 0, err
+		}
 		if strings.HasPrefix(v.Name, "xl/worksheets/sheet") {
 			worksheets++
 		}
@@ -53,16 +55,16 @@ func (f *File) saveFileList(name string, content []byte) {
 }
 
 // Read file content as string in a archive file.
-func readFile(file *zip.File) []byte {
+func readFile(file *zip.File) ([]byte, error) {
 	rc, err := file.Open()
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	dat := make([]byte, 0, file.FileInfo().Size())
 	buff := bytes.NewBuffer(dat)
 	_, _ = io.Copy(buff, rc)
 	rc.Close()
-	return buff.Bytes()
+	return buff.Bytes(), nil
 }
 
 // SplitCellName splits cell name to column name and row number.
@@ -133,6 +135,9 @@ func ColumnNameToNumber(name string) (int, error) {
 		}
 		multi *= 26
 	}
+	if col > TotalColumns {
+		return -1, fmt.Errorf("column number exceeds maximum limit")
+	}
 	return col, nil
 }
 
@@ -160,8 +165,8 @@ func ColumnNumberToName(num int) (string, error) {
 //
 // Example:
 //
-//    CellCoordinates("A1") // returns 1, 1, nil
-//    CellCoordinates("Z3") // returns 26, 3, nil
+//    excelize.CellNameToCoordinates("A1") // returns 1, 1, nil
+//    excelize.CellNameToCoordinates("Z3") // returns 26, 3, nil
 //
 func CellNameToCoordinates(cell string) (int, int, error) {
 	const msg = "cannot convert cell %q to coordinates: %v"
@@ -170,13 +175,11 @@ func CellNameToCoordinates(cell string) (int, int, error) {
 	if err != nil {
 		return -1, -1, fmt.Errorf(msg, cell, err)
 	}
-
-	col, err := ColumnNameToNumber(colname)
-	if err != nil {
-		return -1, -1, fmt.Errorf(msg, cell, err)
+	if row > TotalRows {
+		return -1, -1, fmt.Errorf("row number exceeds maximum limit")
 	}
-
-	return col, row, nil
+	col, err := ColumnNameToNumber(colname)
+	return col, row, err
 }
 
 // CoordinatesToCellName converts [X, Y] coordinates to alpha-numeric cell
@@ -184,18 +187,14 @@ func CellNameToCoordinates(cell string) (int, int, error) {
 //
 // Example:
 //
-//    CoordinatesToCellName(1, 1) // returns "A1", nil
+//    excelize.CoordinatesToCellName(1, 1) // returns "A1", nil
 //
 func CoordinatesToCellName(col, row int) (string, error) {
 	if col < 1 || row < 1 {
 		return "", fmt.Errorf("invalid cell coordinates [%d, %d]", col, row)
 	}
 	colname, err := ColumnNumberToName(col)
-	if err != nil {
-		// Error should never happens here.
-		return "", fmt.Errorf("invalid cell coordinates [%d, %d]: %v", col, row, err)
-	}
-	return fmt.Sprintf("%s%d", colname, row), nil
+	return fmt.Sprintf("%s%d", colname, row), err
 }
 
 // boolPtr returns a pointer to a bool with the given value.

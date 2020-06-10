@@ -28,7 +28,7 @@ import (
 	"golang.org/x/net/html/charset"
 )
 
-// File define a populated XLSX file struct.
+// File define a populated spreadsheet file struct.
 type File struct {
 	checked          map[string]bool
 	sheetMap         map[string]string
@@ -38,6 +38,7 @@ type File struct {
 	Drawings         map[string]*xlsxWsDr
 	Path             string
 	SharedStrings    *xlsxSST
+	sharedStringsMap map[string]int
 	Sheet            map[string]*xlsxWorksheet
 	SheetCount       int
 	Styles           *xlsxStyleSheet
@@ -52,8 +53,8 @@ type File struct {
 
 type charsetTranscoderFn func(charset string, input io.Reader) (rdr io.Reader, err error)
 
-// OpenFile take the name of an XLSX file and returns a populated XLSX file
-// struct for it.
+// OpenFile take the name of an spreadsheet file and returns a populated
+// spreadsheet file struct for it.
 func OpenFile(filename string) (*File, error) {
 	file, err := os.Open(filename)
 	if err != nil {
@@ -75,6 +76,7 @@ func newFile() *File {
 		sheetMap:         make(map[string]string),
 		Comments:         make(map[string]*xlsxComments),
 		Drawings:         make(map[string]*xlsxWsDr),
+		sharedStringsMap: make(map[string]int),
 		Sheet:            make(map[string]*xlsxWorksheet),
 		DecodeVMLDrawing: make(map[string]*decodeVmlDrawing),
 		VMLDrawing:       make(map[string]*vmlDrawing),
@@ -83,7 +85,8 @@ func newFile() *File {
 	}
 }
 
-// OpenReader take an io.Reader and return a populated XLSX file.
+// OpenReader read data stream from io.Reader and return a populated
+// spreadsheet file.
 func OpenReader(r io.Reader) (*File, error) {
 	b, err := ioutil.ReadAll(r)
 	if err != nil {

@@ -166,6 +166,7 @@ func TestOpenFile(t *testing.T) {
 		assert.NoError(t, f.SetCellStr("Sheet2", "c"+strconv.Itoa(i), strconv.Itoa(i)))
 	}
 	assert.NoError(t, f.SaveAs(filepath.Join("test", "TestOpenFile.xlsx")))
+	assert.EqualError(t, f.SaveAs(filepath.Join("test", strings.Repeat("c", 199), ".xlsx")), "file name length exceeds maximum limit")
 }
 
 func TestSaveFile(t *testing.T) {
@@ -220,6 +221,22 @@ func TestOpenReader(t *testing.T) {
 
 	_, err = OpenReader(r)
 	assert.EqualError(t, err, "unexpected EOF")
+
+	_, err = OpenReader(bytes.NewReader([]byte{
+		0x50, 0x4b, 0x03, 0x04, 0x0a, 0x00, 0x09, 0x00, 0x63, 0x00, 0x47, 0xa3, 0xb6, 0x50, 0x00, 0x00,
+		0x00, 0x00, 0x1c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x0b, 0x00, 0x70, 0x61,
+		0x73, 0x73, 0x77, 0x6f, 0x72, 0x64, 0x01, 0x99, 0x07, 0x00, 0x02, 0x00, 0x41, 0x45, 0x03, 0x00,
+		0x00, 0x21, 0x06, 0x59, 0xc0, 0x12, 0xf3, 0x19, 0xc7, 0x51, 0xd1, 0xc9, 0x31, 0xcb, 0xcc, 0x8a,
+		0xe1, 0x44, 0xe1, 0x56, 0x20, 0x24, 0x1f, 0xba, 0x09, 0xda, 0x53, 0xd5, 0xef, 0x50, 0x4b, 0x07,
+		0x08, 0x00, 0x00, 0x00, 0x00, 0x1c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x50, 0x4b, 0x01,
+		0x02, 0x1f, 0x00, 0x0a, 0x00, 0x09, 0x00, 0x63, 0x00, 0x47, 0xa3, 0xb6, 0x50, 0x00, 0x00, 0x00,
+		0x00, 0x1c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x0b, 0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x70, 0x61, 0x73, 0x73, 0x77,
+		0x6f, 0x72, 0x64, 0x01, 0x99, 0x07, 0x00, 0x02, 0x00, 0x41, 0x45, 0x03, 0x00, 0x00, 0x50, 0x4b,
+		0x05, 0x06, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x41, 0x00, 0x00, 0x00, 0x5d, 0x00,
+		0x00, 0x00, 0x00, 0x00,
+	}))
+	assert.EqualError(t, err, "zip: unsupported compression algorithm")
 }
 
 func TestBrokenFile(t *testing.T) {
@@ -752,16 +769,14 @@ func TestSetCellStyleCustomNumberFormat(t *testing.T) {
 	assert.NoError(t, f.SetCellValue("Sheet1", "A1", 42920.5))
 	assert.NoError(t, f.SetCellValue("Sheet1", "A2", 42920.5))
 	style, err := f.NewStyle(`{"custom_number_format": "[$-380A]dddd\\,\\ dd\" de \"mmmm\" de \"yyyy;@"}`)
-	if err != nil {
-		t.Log(err)
-	}
+	assert.NoError(t, err)
 	assert.NoError(t, f.SetCellStyle("Sheet1", "A1", "A1", style))
-	style, err = f.NewStyle(`{"custom_number_format": "[$-380A]dddd\\,\\ dd\" de \"mmmm\" de \"yyyy;@"}`)
-	if err != nil {
-		t.Log(err)
-	}
+	style, err = f.NewStyle(`{"custom_number_format": "[$-380A]dddd\\,\\ dd\" de \"mmmm\" de \"yyyy;@","font":{"color":"#9A0511"}}`)
+	assert.NoError(t, err)
 	assert.NoError(t, f.SetCellStyle("Sheet1", "A2", "A2", style))
 
+	_, err = f.NewStyle(`{"custom_number_format": "[$-380A]dddd\\,\\ dd\" de \"mmmm\" de \"yy;@"}`)
+	assert.NoError(t, err)
 	assert.NoError(t, f.SaveAs(filepath.Join("test", "TestSetCellStyleCustomNumberFormat.xlsx")))
 }
 
@@ -774,21 +789,15 @@ func TestSetCellStyleFill(t *testing.T) {
 	var style int
 	// Test set fill for cell with invalid parameter.
 	style, err = f.NewStyle(`{"fill":{"type":"gradient","color":["#FFFFFF","#E0EBF5"],"shading":6}}`)
-	if !assert.NoError(t, err) {
-		t.FailNow()
-	}
+	assert.NoError(t, err)
 	assert.NoError(t, f.SetCellStyle("Sheet1", "O23", "O23", style))
 
 	style, err = f.NewStyle(`{"fill":{"type":"gradient","color":["#FFFFFF"],"shading":1}}`)
-	if !assert.NoError(t, err) {
-		t.FailNow()
-	}
+	assert.NoError(t, err)
 	assert.NoError(t, f.SetCellStyle("Sheet1", "O23", "O23", style))
 
 	style, err = f.NewStyle(`{"fill":{"type":"pattern","color":[],"pattern":1}}`)
-	if !assert.NoError(t, err) {
-		t.FailNow()
-	}
+	assert.NoError(t, err)
 	assert.NoError(t, f.SetCellStyle("Sheet1", "O23", "O23", style))
 
 	style, err = f.NewStyle(`{"fill":{"type":"pattern","color":["#E0EBF5"],"pattern":19}}`)

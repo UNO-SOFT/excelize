@@ -281,15 +281,39 @@ func (f *File) AutoFilter(sheet, hcell, vcell, format string) error {
 	formatSet, _ := parseAutoFilterSet(format)
 
 	var cellStart, cellEnd string
-	cellStart, err = CoordinatesToCellName(hcol, hrow)
-	if err != nil {
+	if cellStart, err = CoordinatesToCellName(hcol, hrow); err != nil {
 		return err
 	}
-	cellEnd, err = CoordinatesToCellName(vcol, vrow)
-	if err != nil {
+	if cellEnd, err = CoordinatesToCellName(vcol, vrow); err != nil {
 		return err
 	}
-	ref := cellStart + ":" + cellEnd
+	ref, filterDB := cellStart+":"+cellEnd, "_xlnm._FilterDatabase"
+	wb := f.workbookReader()
+	sheetID := f.GetSheetIndex(sheet)
+	filterRange := fmt.Sprintf("%s!%s", sheet, ref)
+	d := xlsxDefinedName{
+		Name:         filterDB,
+		Hidden:       true,
+		LocalSheetID: intPtr(sheetID),
+		Data:         filterRange,
+	}
+	if wb.DefinedNames == nil {
+		wb.DefinedNames = &xlsxDefinedNames{
+			DefinedName: []xlsxDefinedName{d},
+		}
+	} else {
+		var definedNameExists bool
+		for idx := range wb.DefinedNames.DefinedName {
+			definedName := wb.DefinedNames.DefinedName[idx]
+			if definedName.Name == filterDB && *definedName.LocalSheetID == sheetID && definedName.Hidden {
+				wb.DefinedNames.DefinedName[idx].Data = filterRange
+				definedNameExists = true
+			}
+		}
+		if !definedNameExists {
+			wb.DefinedNames.DefinedName = append(wb.DefinedNames.DefinedName, d)
+		}
+	}
 	refRange := vcol - hcol
 	return f.autoFilter(sheet, ref, refRange, hcol, formatSet)
 }

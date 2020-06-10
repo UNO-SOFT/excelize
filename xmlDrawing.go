@@ -80,6 +80,15 @@ const (
 	ExtURIMacExcelMX             = "{64002731-A6B0-56B0-2670-7721B7C09600}"
 )
 
+// Excel specifications and limits
+const (
+	FileNameLength       = 207
+	TotalRows            = 1048576
+	TotalColumns         = 16384
+	TotalSheetHyperlinks = 65529
+	TotalCellChars       = 32767
+)
+
 var supportImageTypes = map[string]string{".gif": ".gif", ".jpg": ".jpeg", ".jpeg": ".jpeg", ".png": ".png", ".tif": ".tiff", ".tiff": ".tiff"}
 
 // xlsxCNvPr directly maps the cNvPr (Non-Visual Drawing Properties). This
@@ -419,6 +428,7 @@ type formatPicture struct {
 	FPrintsWithSheet bool    `json:"print_obj"`
 	FLocksWithSheet  bool    `json:"locked"`
 	NoChangeAspect   bool    `json:"lock_aspect_ratio"`
+	Autofit          bool    `json:"autofit"`
 	OffsetX          int     `json:"x_offset"`
 	OffsetY          int     `json:"y_offset"`
 	XScale           float64 `json:"x_scale"`
